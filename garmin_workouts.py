@@ -14,7 +14,8 @@ from zoneinfo import ZoneInfo
 
 from garminconnect import Garmin
 from garminconnect import exercises as catalog
-from garminconnect.workout import StrengthWorkout, WorkoutSegment, create_strength_set
+from garminconnect.workout import (BaseWorkout, ExecutableStep, StrengthWorkout, WorkoutSegment,
+                                   create_strength_set)
 
 from common import Supabase, env, read_token_file, write_token_file
 
@@ -45,6 +46,48 @@ def build_strength(spec: dict) -> StrengthWorkout:
     )
 
 
+DEPORTES = {
+    "hiit": {"sportTypeId": 9, "sportTypeKey": "hiit"},
+    "cardio": {"sportTypeId": 6, "sportTypeKey": "cardio_training"},
+    "otro": {"sportTypeId": 3, "sportTypeKey": "other"},
+    "movilidad": {"sportTypeId": 11, "sportTypeKey": "mobility"},
+}
+TIPOS_PASO = {
+    "calentamiento": {"stepTypeId": 1, "stepTypeKey": "warmup", "displayOrder": 1},
+    "principal": {"stepTypeId": 3, "stepTypeKey": "interval", "displayOrder": 3},
+    "enfriamiento": {"stepTypeId": 2, "stepTypeKey": "cooldown", "displayOrder": 2},
+}
+SIN_OBJETIVO = {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target", "displayOrder": 1}
+
+
+def build_simple(spec: dict) -> BaseWorkout:
+    """Entrenamiento por pasos: cada paso dura X minutos o termina al tocar el botón (vuelta)."""
+    sport = DEPORTES[spec["deporte"]]
+    steps, secs = [], 0
+    for i, p in enumerate(spec["pasos"], start=1):
+        if p.get("minutos"):
+            end = {"conditionTypeId": 2, "conditionTypeKey": "time", "displayOrder": 2, "displayable": True}
+            value = float(p["minutos"] * 60)
+            secs += p["minutos"] * 60
+        else:
+            end = {"conditionTypeId": 1, "conditionTypeKey": "lap.button", "displayOrder": 1, "displayable": True}
+            value = None
+            secs += p.get("minutos_estimados", 0) * 60
+        steps.append(ExecutableStep(stepOrder=i, stepType=TIPOS_PASO[p["tipo"]], endCondition=end,
+                                    endConditionValue=value, targetType=SIN_OBJETIVO, description=p.get("nota")))
+    return BaseWorkout(
+        workoutName=spec["nombre"], description=spec.get("descripcion"), sportType=sport,
+        estimatedDurationInSecs=int(secs),
+        workoutSegments=[WorkoutSegment(segmentOrder=1, sportType=sport, workoutSteps=steps)],
+    )
+
+
+def upload(c: Garmin, spec: dict) -> dict:
+    if spec.get("tipo", "fuerza") == "fuerza":
+        return c.upload_strength_workout(build_strength(spec))
+    return c.upload_workout(build_simple(spec).to_dict())
+
+
 def ensure_workout(c: Garmin, db: Supabase, key: str, spec: dict, today: str) -> int:
     h = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:16]
     rows = db.select("garmin_workouts", {"key": f"eq.{key}", "select": "workout_id,plan_hash"})
@@ -56,7 +99,7 @@ def ensure_workout(c: Garmin, db: Supabase, key: str, spec: dict, today: str) ->
         except Exception as e:
             print(f"  aviso: no se pudo borrar la versión anterior ({type(e).__name__})")
         db.delete("garmin_schedule", {"key": f"eq.{key}", "day": f"gte.{today}"})
-    created = c.upload_strength_workout(build_strength(spec))
+    created = upload(c, spec)
     wid = created["workoutId"]
     db.upsert("garmin_workouts", [{"key": key, "workout_id": wid, "name": spec["nombre"], "plan_hash": h,
                                    "updated_at": datetime.now(ZoneInfo("UTC")).isoformat()}], "key")
@@ -108,4 +151,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-# 2026-11-02T22:41:41Z
