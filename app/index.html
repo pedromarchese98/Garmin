@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mi Rendimiento</title>
+  <meta name="theme-color" content="#14231C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Rendimiento">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="login" class="login" hidden>
+    <div class="login-box">
+      <svg class="login-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="3"/><line x1="10" y1="32" x2="54" y2="32" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="32" r="3.5" fill="currentColor"/></svg>
+      <h1>Mi rendimiento</h1>
+      <p class="muted">Entrá con tu contraseña para ver tus datos.</p>
+      <form id="login-form" autocomplete="on">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required>
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" minlength="8" required>
+        <button type="submit" class="btn">Entrar</button>
+        <button type="button" id="signup" class="btn btn-quiet">Es la primera vez: crear contraseña</button>
+        <p id="login-msg" class="login-msg" role="status"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <main id="view" tabindex="-1"></main>
+    <nav class="tabs" aria-label="Secciones">
+      <button data-tab="hoy" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg>Hoy</button>
+      <button data-tab="futbol"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><line x1="12" y1="5" x2="12" y2="19"/><circle cx="12" cy="12" r="3"/></svg>Fútbol</button>
+      <button data-tab="fuerza"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="12" x2="18" y2="12"/><rect x="3" y="8" width="3" height="8" rx="1"/><rect x="18" y="8" width="3" height="8" rx="1"/></svg>Fuerza</button>
+      <button data-tab="sueno"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg>Sueño</button>
+      <button data-tab="progreso"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="4,17 9,12 13,15 20,7"/><polyline points="15,7 20,7 20,12"/></svg>Progreso</button>
+    </nav>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
