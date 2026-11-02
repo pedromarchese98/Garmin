@@ -2,6 +2,9 @@ name: Login de Garmin (una vez)
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/login-request"
 
 concurrency:
   group: garmin-sync
