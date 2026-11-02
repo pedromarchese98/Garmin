@@ -1,23 +1,18 @@
-name: Agendar entrenamientos
+name: Borrar entrenamientos agendados
 
 on:
   push:
     paths:
-      - "plan.json"
-      - "garmin_workouts.py"
-  schedule:
-    # Domingos 21:13 de Argentina: agenda las próximas dos semanas
-    - cron: "13 0 * * 1"
-  workflow_dispatch:
+      - "garmin_cleanup.py"
 
 concurrency:
   group: garmin-sync
   cancel-in-progress: false
 
 jobs:
-  workouts:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,8 +20,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Crear y agendar entrenamientos
+      - name: Borrar entrenamientos y fechas
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: python garmin_workouts.py
+        run: python garmin_cleanup.py
