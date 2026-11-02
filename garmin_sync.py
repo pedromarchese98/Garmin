@@ -140,6 +140,50 @@ def fetch_activities(c: Garmin, start: str, end: str) -> list[dict]:
     return rows
 
 
+def fetch_strength_sets(c: Garmin, acts: list[dict]) -> list[dict]:
+    """Series de las actividades de fuerza (ejercicio más probable, reps, peso)."""
+    rows = []
+    for a in acts:
+        if a.get("activity_type") != "strength_training":
+            continue
+        data = safe(c.get_activity_exercise_sets, a["activity_id"]) or {}
+        day = datetime.fromisoformat(a["start_time"]).astimezone(ZoneInfo("America/Argentina/Buenos_Aires")).date().isoformat()
+        idx = 0
+        for s in data.get("exerciseSets") or []:
+            if s.get("setType") != "ACTIVE":
+                continue
+            ex = max(s.get("exercises") or [{}], key=lambda e: e.get("probability") or 0)
+            w = s.get("weight")
+            rows.append({
+                "activity_id": a["activity_id"], "set_index": idx, "day": day,
+                "category": ex.get("category"), "exercise": ex.get("name"),
+                "reps": s.get("repetitionCount"),
+                "weight_kg": round(w / 1000, 2) if isinstance(w, (int, float)) and w > 0 else None,
+                "duration_s": s.get("duration"),
+            })
+            idx += 1
+    return rows
+
+
+def fetch_fitness(c: Garmin, day: str) -> dict | None:
+    fa = safe(c.get_fitnessage_data, day) or {}
+    rp = safe(c.get_race_predictions) or {}
+    if not fa and not rp:
+        return None
+    return {
+        "day": day,
+        "fitness_age": fa.get("fitnessAge"),
+        "achievable_fitness_age": fa.get("achievableFitnessAge"),
+        "chronological_age": fa.get("chronologicalAge"),
+        "vigorous_days_avg": g(fa, "components", "vigorousDaysAvg", "value"),
+        "race_5k_s": rp.get("time5K"),
+        "race_10k_s": rp.get("time10K"),
+        "race_half_s": rp.get("timeHalfMarathon"),
+        "raw": {"fitness_age": fa, "race": rp},
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def main() -> None:
     db = Supabase(env("SUPABASE_URL"), env("SUPABASE_SECRET_KEY"))
     days = int(os.environ.get("SYNC_DAYS") or 3)
@@ -164,13 +208,21 @@ def main() -> None:
         acts = fetch_activities(client, day_list[0], day_list[-1])
         db.upsert("activities", acts, "activity_id")
 
+        sets = fetch_strength_sets(client, acts)
+        db.upsert("strength_sets", sets, "activity_id,set_index")
+
+        snap = fetch_fitness(client, day_list[-1])
+        if snap:
+            db.upsert("fitness_snapshots", [snap], "day")
+
         # Si Garmin renovó los tokens durante la corrida, guardamos los nuevos.
         new_tokens = read_token_file(folder)
         if new_tokens and new_tokens != tokens:
             db.save_tokens(new_tokens)
             print("Sesión de Garmin renovada y guardada.")
 
-        db.insert("sync_log", {"status": "ok", "days_synced": len(rows), "activities_synced": len(acts)})
+        db.insert("sync_log", {"status": "ok", "days_synced": len(rows), "activities_synced": len(acts),
+                               "message": f"{len(sets)} series de fuerza"})
         print(f"OK: {len(rows)} días, {len(acts)} actividades.")
     except Exception as e:
         db.insert("sync_log", {"status": "error", "message": f"{type(e).__name__}: {e}"[:500]})

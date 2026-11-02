@@ -5,6 +5,9 @@ on:
     # Horario en UTC: 07:17 y 20:47 de Argentina
     - cron: "17 10 * * *"
     - cron: "47 23 * * *"
+  push:
+    paths:
+      - ".github/sync-request"
   workflow_dispatch:
     inputs:
       days:
@@ -18,7 +21,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,5 +33,10 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          SYNC_DAYS: ${{ github.event.inputs.days || '3' }}
-        run: python garmin_sync.py
+          INPUT_DAYS: ${{ github.event.inputs.days }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "push" ]; then DAYS=$(head -1 .github/sync-request | tr -dc '0-9'); fi
+          export SYNC_DAYS="${INPUT_DAYS:-${DAYS:-3}}"
+          echo "Sincronizando $SYNC_DAYS días"
+          python garmin_sync.py
