@@ -1,0 +1,21 @@
+{
+  "dias_a_agendar": 14,
+  "entrenamientos": {
+    "fuerza_mancuernas": {
+      "nombre": "Fuerza con mancuernas",
+      "descripcion": "Rutina de lunes, jueves y viernes.",
+      "ejercicios": [
+        {"garmin": "Dumbbell Squat", "series": 3, "reps": 12, "descanso": 60, "nota": "Sentadilla con mancuernas"},
+        {"garmin": "Alternating Dumbbell Lunge", "series": 3, "reps": 20, "descanso": 60, "nota": "Estocadas: 10 por pierna"},
+        {"garmin": "Push-up", "series": 3, "reps": 12, "descanso": 60, "nota": "Flexiones de brazos"},
+        {"garmin": "Dumbbell Shoulder Press", "series": 3, "reps": 10, "descanso": 60, "nota": "Press de hombros"},
+        {"garmin": "Dumbbell Biceps Curl", "series": 3, "reps": 12, "descanso": 60, "nota": "Curl de bíceps"}
+      ]
+    }
+  },
+  "semana": {
+    "lunes": "fuerza_mancuernas",
+    "jueves": "fuerza_mancuernas",
+    "viernes": "fuerza_mancuernas"
+  }
+}

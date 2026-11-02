@@ -49,6 +49,18 @@ class Supabase:
         if r.status_code >= 300:
             print(f"Aviso: no se pudo escribir en {table}: {r.status_code}")
 
+    def select(self, table: str, params: dict) -> list[dict]:
+        r = requests.get(f"{self.base}/{table}", params=params, headers=self.headers, timeout=30)
+        if r.status_code >= 300:
+            raise RuntimeError(f"Supabase {table}: {r.status_code} {r.text[:300]}")
+        return r.json()
+
+    def delete(self, table: str, params: dict) -> None:
+        r = requests.delete(f"{self.base}/{table}", params=params,
+                            headers={**self.headers, "Prefer": "return=minimal"}, timeout=30)
+        if r.status_code >= 300:
+            raise RuntimeError(f"Supabase {table}: {r.status_code} {r.text[:300]}")
+
     def get_tokens(self) -> dict | None:
         r = requests.get(
             f"{self.base}/garmin_auth",
