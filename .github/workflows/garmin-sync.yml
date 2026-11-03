@@ -2,9 +2,9 @@ name: Sincronizar Garmin
 
 on:
   schedule:
-    # Horario en UTC: 07:17 y 20:47 de Argentina
-    - cron: "17 10 * * *"
-    - cron: "47 23 * * *"
+    # Cada 2 horas (UTC). En Argentina: 07:23, 09:23, 11:23, 13:23... 05:23.
+    # GitHub puede demorar o saltear corridas; con esta frecuencia, la siguiente cubre el hueco.
+    - cron: "23 */2 * * *"
   push:
     paths:
       - ".github/sync-request"

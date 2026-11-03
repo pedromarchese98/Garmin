@@ -178,9 +178,24 @@ async function renderHoy() {
     </ul>
     <p class="foot">Es un indicador propio, armado con tus datos; sirve para orientar el entrenamiento, no es un dato médico.<br>
       Última sincronización: ${sync[0] ? new Date(sync[0].ran_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "—"} ·
-      <button id="logout">Cerrar sesión</button></p>`;
+      <button id="change-pw">Cambiar contraseña</button> · <button id="logout">Cerrar sesión</button></p>
+    <form id="pw-form" class="goal-form" hidden>
+      <label class="small muted" for="new-pw">Nueva contraseña (mínimo 8 caracteres)</label>
+      <div class="pair"><input id="new-pw" type="text" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="8" required>
+        <button class="btn btn-small" type="submit">Guardar contraseña</button></div>
+      <p id="pw-msg" class="small muted" role="status"></p>
+    </form>`;
   requestAnimationFrame(() => { const a = $(".arc"); if (a) a.style.strokeDashoffset = off; });
   $("#logout").onclick = async () => { await db.auth.signOut(); location.reload(); };
+  $("#change-pw").onclick = () => { $("#pw-form").hidden = false; $("#new-pw").focus(); };
+  $("#pw-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const pw = $("#new-pw").value;
+    if (pw.length < 8) { $("#pw-msg").textContent = "Usá al menos 8 caracteres."; return; }
+    const { error } = await db.auth.updateUser({ password: pw });
+    $("#pw-msg").textContent = error ? "No se pudo cambiar: " + error.message : "Contraseña cambiada. Usala para entrar desde la pantalla de inicio.";
+    if (!error) $("#new-pw").value = "";
+  };
 }
 
 async function renderFutbol() {
@@ -396,25 +411,29 @@ async function start() {
   } else {
     $("#app").hidden = true; $("#login").hidden = false;
     $("#email").value = OWNER;
+    $("#email-label").textContent = `Cuenta: ${OWNER}`;
   }
 }
+$("#toggle-pw").onclick = () => {
+  const i = $("#password"), show = i.type === "password";
+  i.type = show ? "text" : "password";
+  $("#toggle-pw").textContent = show ? "Ocultar" : "Mostrar";
+  $("#toggle-pw").setAttribute("aria-pressed", String(show));
+};
+let entrando = false;
 $("#login-form").onsubmit = async (e) => {
   e.preventDefault();
+  if (entrando) return;
+  entrando = true; $("#login-btn").disabled = true;
   $("#login-msg").textContent = "Entrando…";
-  const { error } = await db.auth.signInWithPassword({ email: $("#email").value.trim(), password: $("#password").value });
+  const { error } = await db.auth.signInWithPassword({ email: OWNER, password: $("#password").value });
+  entrando = false; $("#login-btn").disabled = false;
   if (error) {
-    $("#login-msg").textContent = /confirm/i.test(error.message) ? "Tu cuenta todavía no está confirmada. Avisale a Claude o tocá el link del mail." : "Email o contraseña incorrectos.";
+    $("#login-msg").textContent = /confirm/i.test(error.message)
+      ? "Tu cuenta todavía no está confirmada. Avisale a Claude."
+      : "La contraseña no coincide. Tocá Mostrar para revisar lo que escribiste. Si la creó el iPhone, la encontrás en Ajustes → Contraseñas, buscando mi-rendimiento.";
     return;
   }
   start();
-};
-$("#signup").onclick = async () => {
-  const email = $("#email").value.trim(), password = $("#password").value;
-  if (password.length < 8) { $("#login-msg").textContent = "Elegí una contraseña de al menos 8 caracteres y volvé a tocar el botón."; $("#password").focus(); return; }
-  $("#login-msg").textContent = "Creando tu cuenta…";
-  const { data, error } = await db.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } });
-  if (error) { $("#login-msg").textContent = "No se pudo crear la cuenta: " + error.message; return; }
-  if (data.session) start();
-  else $("#login-msg").textContent = "Cuenta creada. Avisale a Claude para que la active, o tocá el link que te llegó por mail, y después entrá con tu contraseña.";
 };
 start();

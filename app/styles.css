@@ -53,6 +53,13 @@ button, input, select { font: inherit; color: inherit; }
   padding: 12px 14px; border-radius: 10px; border: 1px solid var(--chalk);
   background: var(--surface); font-size: 17px;
 }
+.pw { position: relative; }
+.pw input { width: 100%; padding-right: 84px; }
+.pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  border: 0; background: none; color: var(--grass); font-size: 15px; padding: 8px; cursor: pointer;
+}
+.btn[disabled] { opacity: .6; }
 .login-msg { min-height: 1.4em; font-size: 15px; color: var(--ink-2); margin: 4px 0 0; }
 .btn {
   margin-top: 10px; padding: 13px 16px; border: 0; border-radius: 10px;
