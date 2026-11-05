@@ -135,13 +135,17 @@ async function renderHoy() {
   const st = estado(score);
   const act = RUTINA[hoy.getDay()];
   const C = 2 * Math.PI * 84 * 0.75;
-  const off = score === null ? C : C * (1 - score / 100);
-  const col = st ? css(`--${st.k}`) : css("--chalk");
+  const completo = !!r.completo;
+  const col = st ? (completo ? css(`--${st.k}`) : css("--ink-2")) : css("--chalk");
+  const faltan = [n(r.sueno_h) === null && "sueño", n(r.hrv_noche) === null && "HRV", n(r.fc_reposo) === null && "FC en reposo"].filter(Boolean);
+  const lista = (xs) => (xs.length > 1 ? xs.slice(0, -1).join(", ") + " y " + xs[xs.length - 1] : xs[0] || "");
+  const mostrar = completo ? score : null;
+  const off = mostrar === null ? C : C * (1 - mostrar / 100);
   const dayLabel = r.day ? (r.day === todayISO() ? "datos de esta mañana" : `datos del ${shortDate(parseDay(r.day))}`) : "sin datos todavía";
 
   const factor = (label, val, p, note) => `<li><span class="label">${label}</span><span class="val">${val}</span>
     <span class="bar" aria-hidden="true"><i style="width:${n(p) === null ? 0 : Math.max(4, n(p))}%"></i></span>${note ? `<span class="note">${note}</span>` : ""}</li>`;
-  const parte = reps[0] && reps[0].day === todayISO() ? reps[0] : null;
+  const parte = reps[0] && reps[0].day === arDay(new Date()) ? reps[0] : null;
 
   view.innerHTML = `
     <p class="date">${longDate(hoy)}</p>
@@ -154,19 +158,22 @@ async function renderHoy() {
           stroke-dasharray="${C} ${2 * Math.PI * 84}" stroke-dashoffset="${C}" transform="rotate(135 100 100)"/>
         <line x1="34" y1="112" x2="166" y2="112" stroke="${css("--chalk")}" stroke-width="1.5"/>
         <circle cx="100" cy="112" r="3" fill="${css("--chalk")}"/>
-        <text x="100" y="100" text-anchor="middle" class="g-num" fill="${css("--ink")}">${score === null ? "—" : score}</text>
+        <text x="100" y="100" text-anchor="middle" class="g-num" fill="${css("--ink")}">${mostrar === null ? "—" : mostrar}</text>
         <text x="100" y="134" text-anchor="middle" class="g-sub" fill="${css("--ink-2")}">de 100</text>
         <text x="100" y="150" text-anchor="middle" class="g-sub" fill="${css("--ink-2")}">${dayLabel}</text>
       </svg>
     </div>
-    <p class="state ${st ? st.k : ""}">${st ? st.t : "Esperando tu primera noche con datos"}</p>
+    ${st && !completo
+      ? `<p class="state prov">Provisorio: falta ${lista(faltan)} de esta noche</p>
+         <p class="muted small" style="text-align:center">Con los ${n(r.componentes) || 0} datos que hay daría ${score}, pero no es confiable sin ${faltan.includes("sueño") ? "el sueño" : "la HRV"}. El número aparece cuando tu reloj sincronice.</p>`
+      : `<p class="state ${st ? st.k : ""}">${st ? st.t : "Esperando tu primera noche con datos"}</p>`}
 
     <div class="plan">
       <h3>Hoy toca: ${NOMBRE[act]}</h3>
-      <p>${st ? CONSEJO[act][st.i] : "Cuando haya datos de tu noche te digo cómo encararlo."}</p>
+      <p>${st ? CONSEJO[act][st.i] : "Cuando haya datos de tu noche te digo cómo encararlo."}${st && !completo ? " (Orientativo hasta que lleguen los datos de la noche.)" : ""}</p>
     </div>
 
-    ${parte ? `<h2>Parte del día</h2><div class="report">${md(parte.body)}</div>` : ""}
+    ${parte ? `<h2>Parte del día</h2><div class="report">${md(parte.body)}<p class="muted small">Escrito ${cuando(parte.created_at)}${parte.readiness === null ? " · provisorio, se rehace cuando lleguen los datos de la noche" : ""}</p></div>` : ""}
 
     <h2>De dónde sale el número</h2>
     <ul class="factors">
@@ -177,7 +184,6 @@ async function renderHoy() {
       ${factor("Carga de entrenamiento", r.p_carga === null || r.p_carga === undefined ? "sin historia" : fmt(r.acwr, 2), r.p_carga, r.p_carga === null || r.p_carga === undefined ? "Se suma cuando haya un mes de entrenamientos registrados" : "Semana actual dividida por tu promedio del mes")}
     </ul>
     <p class="foot">Es un indicador propio, armado con tus datos; sirve para orientar el entrenamiento, no es un dato médico.<br>
-      Última sincronización: ${sync[0] ? new Date(sync[0].ran_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "—"} ·
       <button id="change-pw">Cambiar contraseña</button> · <button id="logout">Cerrar sesión</button></p>
     <form id="pw-form" class="goal-form" hidden>
       <label class="small muted" for="new-pw">Nueva contraseña (mínimo 8 caracteres)</label>
@@ -269,9 +275,9 @@ async function renderFuerza() {
       <div class="chart">${chart({ points: pts, bars: { key: "reps" }, height: 150 })}</div>
       <h2>Por ejercicio</h2>
       <table class="t"><thead><tr><th>Ejercicio</th><th class="r">Series</th><th class="r">Mejor reps</th><th class="r">Peso máx.</th></tr></thead>
-        <tbody>${Object.values(ej).sort((a, b) => b.series - a.series).map((e) => `<tr><td>${esc(EJ[e.k] || e.k.toLowerCase().replace(/_/g, " "))}</td>
+        <tbody>${Object.values(ej).sort((a, b) => b.series - a.series).map((e) => `<tr><td>${esc(EJ[e.k] || e.k.toLowerCase().replace(/_/g, " "))}${RUTINA_EJ.has(e.k) ? "" : ` <span class="muted small" title="No está en tu rutina: puede ser un error de reconocimiento">¿?</span>`}</td>
           <td class="r">${e.series}</td><td class="r">${e.maxReps || "—"}</td><td class="r">${e.maxKg ? fmt(e.maxKg, 1) + " kg" : "—"}</td></tr>`).join("")}</tbody></table>
-      <p class="muted small">El ejercicio lo reconoce el reloj automáticamente; si se equivoca, corregilo en Garmin Connect y se actualiza acá.</p>`
+      <p class="muted small">${sets.filter((s) => n(s.weight_kg) > 0).length} de ${sets.length} series tienen peso cargado. El ejercicio lo reconoce el reloj automáticamente; los marcados con ¿? no están en tu rutina y probablemente estén mal reconocidos: corregilos en Garmin Connect y se actualizan acá.</p>`
     : `<div class="empty"><strong>Todavía no hay series registradas.</strong>
         Grabá tu próxima rutina con la actividad Fuerza y tocá el botón al terminar cada serie. Acá vas a ver series, repeticiones y peso por ejercicio, y cómo progresás.</div>`}`;
 }
@@ -389,12 +395,201 @@ async function renderProgreso() {
   view.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => { await db.from("goals").update({ active: false }).eq("id", b.dataset.del); renderProgreso(); }));
 }
 
+/* ---------- estado de los datos ---------- */
+const AR = "America/Argentina/Buenos_Aires";
+const arDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: AR }).format(d); // YYYY-MM-DD
+const arHM = (d) => new Intl.DateTimeFormat("es-AR", { timeZone: AR, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+function cuando(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts), hoyS = arDay(new Date()), ayerS = arDay(new Date(Date.now() - 864e5));
+  const dia = arDay(d) === hoyS ? "hoy" : arDay(d) === ayerS ? "ayer" : shortDate(parseDay(arDay(d)));
+  return `${dia} ${arHM(d)}`;
+}
+function hace(ts) {
+  if (!ts) return "";
+  const m = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
+  if (m < 1) return "recién";
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `hace ${h} h${m % 60 && h < 6 ? ` ${m % 60} min` : ""}` : `hace ${Math.floor(h / 24)} días`;
+}
+let ESTADO = null;
+async function cargarEstado() {
+  const rows = await q(db.from("v_estado_datos").select("*"));
+  ESTADO = rows[0] || {};
+  return ESTADO;
+}
+function diagnostico(e) {
+  const ahora = new Date();
+  const horaAR = Number(new Intl.DateTimeFormat("en-GB", { timeZone: AR, hour: "2-digit", hour12: false }).format(ahora));
+  const lectura = e.ultima_lectura ? new Date(e.ultima_lectura) : null;
+  const reloj = e.reloj_a_garmin ? new Date(e.reloj_a_garmin) : null;
+  const errorNuevo = e.ultimo_error_at && (!lectura || new Date(e.ultimo_error_at) > lectura);
+  if (errorNuevo) {
+    const sesion = /login|auth|token|401|403|sesi/i.test(e.ultimo_error || "");
+    return { k: "stop", t: "La última lectura de Garmin falló",
+      d: sesion ? "La sesión con Garmin venció. Avisale a Claude para renovarla." : `Error: ${e.ultimo_error}. Probá Actualizar ahora; si se repite, avisale a Claude.` };
+  }
+  const relojHoyTemprano = reloj && arDay(reloj) === arDay(ahora) && Number(new Intl.DateTimeFormat("en-GB", { timeZone: AR, hour: "2-digit", hour12: false }).format(reloj)) >= 6;
+  if (horaAR >= 6 && (!e.hoy_sueno || !e.hoy_hrv)) {
+    const falta = [!e.hoy_sueno && "el sueño", !e.hoy_hrv && "la HRV"].filter(Boolean).join(" y ");
+    if (!relojHoyTemprano) return { k: "wait", t: "Todavía no llegaron los datos de tu noche",
+      d: `Falta ${falta}. Tu reloj no le pasa datos a Garmin desde ${cuando(e.reloj_a_garmin)}: abrí Garmin Connect en el iPhone, esperá que sincronice y tocá Actualizar ahora.` };
+    if (lectura && reloj && lectura < reloj) return { k: "wait", t: "Hay datos nuevos en Garmin sin leer",
+      d: `Tu reloj sincronizó ${cuando(e.reloj_a_garmin)}, después de la última lectura. Tocá Actualizar ahora.` };
+    return { k: "wait", t: `Garmin no registró ${falta} de anoche`,
+      d: "Suele pasar si dormiste sin el reloj o con la malla floja. El indicador de hoy queda provisorio." };
+  }
+  if (lectura && Date.now() - lectura.getTime() > 3 * 3600e3) return { k: "wait", t: "La lectura automática está atrasada",
+    d: `La última lectura fue ${hace(e.ultima_lectura)}. Tocá Actualizar ahora.` };
+  return { k: "go", t: "Datos al día", d: "" };
+}
+function estadoHTML(e, tab) {
+  const dx = diagnostico(e);
+  return `<section class="fresh ${dx.k}" aria-live="polite">
+    <div class="fresh-head"><strong>${esc(dx.t)}</strong>
+      ${e.token_ok ? `<button class="btn btn-small" id="sync-now">Actualizar ahora</button>` : ""}</div>
+    ${dx.d ? `<p>${esc(dx.d)}</p>` : ""}
+    <dl class="fresh-times">
+      <div><dt>Tu reloj pasó datos a Garmin</dt><dd>${cuando(e.reloj_a_garmin)}</dd></div>
+      <div><dt>La app leyó de Garmin</dt><dd>${cuando(e.ultima_lectura)} <span class="muted small">${hace(e.ultima_lectura)}</span></dd></div>
+    </dl>
+    <p class="fresh-msg" id="sync-msg">${e.token_ok || tab !== "hoy" ? "" : "Para actualizar cuando quieras, configurá la lectura automática en la pestaña Datos."}</p>
+  </section>`;
+}
+function bindEstado(tab) {
+  const b = $("#sync-now");
+  if (!b) return;
+  b.onclick = async () => {
+    b.disabled = true;
+    const antes = ESTADO && ESTADO.ultima_lectura;
+    const { data, error } = await db.rpc("pedir_sincronizacion");
+    const msg = $("#sync-msg");
+    if (error) { msg.textContent = "No se pudo pedir la actualización: " + error.message; b.disabled = false; return; }
+    msg.textContent = data === "reciente" ? "Ya hay una actualización en curso. Esperá un par de minutos…" : "Pedido enviado. Tarda entre 1 y 3 minutos…";
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 20000));
+      const e = await cargarEstado();
+      if (e.ultima_lectura && e.ultima_lectura !== antes) { go(tab); return; }
+    }
+    msg.textContent = "Todavía no terminó. Volvé a abrir la pestaña en unos minutos.";
+    b.disabled = false;
+  };
+}
+
+/* ---------- pestaña Datos ---------- */
+const RUTINA_EJ = new Set(["SQUAT", "LUNGE", "PUSH_UP", "SHOULDER_PRESS", "CURL"]);
+async function renderDatos() {
+  const desde = daysAgoISO(29);
+  const [dm, acts, sets, logs, reqs] = await Promise.all([
+    q(db.from("daily_metrics").select("day,steps,resting_hr,sleep_seconds,hrv_last_night_avg,spo2_avg,respiration_sleep_avg,avg_stress,body_battery_high").gte("day", desde).order("day", { ascending: false })),
+    q(db.from("v_activities").select("day,activity_type,name,categoria,minutos").gte("day", desde).order("start_time", { ascending: false })),
+    q(db.from("strength_sets").select("day,category,exercise,reps,weight_kg").gte("day", desde)),
+    q(db.from("sync_log").select("ran_at,status,days_synced,activities_synced,message").not("days_synced", "is", null).order("ran_at", { ascending: false }).limit(10)),
+    q(db.from("sync_requests").select("requested_at,source").order("requested_at", { ascending: false }).limit(5)),
+  ]);
+  const e = ESTADO || (await cargarEstado());
+  const N = dm.length || 30;
+  const cols = [
+    ["Pasos", (d) => n(d.steps) > 0, "Siempre que tengas el reloj puesto."],
+    ["FC en reposo", (d) => n(d.resting_hr) !== null, "Necesita varias horas con el reloj puesto."],
+    ["Sueño", (d) => n(d.sleep_seconds) > 0, "Falta las noches que dormís sin el reloj."],
+    ["HRV", (d) => n(d.hrv_last_night_avg) !== null, "Necesita toda la noche con el reloj bien ajustado; es el dato más sensible."],
+    ["SpO₂", (d) => n(d.spo2_avg) !== null, "Solo si el Pulse Ox está activo durante el sueño."],
+    ["Estrés y Body Battery", (d) => n(d.avg_stress) !== null && n(d.body_battery_high) !== null, "Se calcula con la FC del día."],
+  ];
+  const cobertura = cols.map(([l, f, why]) => ({ l, ok: dm.filter(f).length, why }));
+  const ultimos = dm.slice(0, 14);
+  const actDias = new Set(acts.map((a) => a.day));
+  // fuerza
+  const porDia = {};
+  sets.forEach((s) => { (porDia[s.day] ||= []).push(s); });
+  const sesiones = Object.entries(porDia).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  const conPeso = sets.filter((s) => n(s.weight_kg) > 0).length;
+  const raras = {};
+  sets.filter((s) => !RUTINA_EJ.has(s.category)).forEach((s) => { const k = s.category || "UNKNOWN"; raras[k] = (raras[k] || 0) + 1; });
+  const tiposRaros = acts.filter((a) => a.activity_type === "mobility");
+
+  view.innerHTML = `
+    <p class="date">Qué llega y qué falta</p>
+    <h1 class="title">Calidad de tus datos</h1>
+
+    <h2>Cobertura de los últimos ${N} días</h2>
+    <ul class="list">${cobertura.map((c) => `<li>
+      <div class="row"><strong>${c.l}</strong><span class="num">${c.ok}/${N} días</span></div>
+      <div class="meter"><i style="width:${Math.round((c.ok / N) * 100)}%"></i></div>
+      ${c.ok < N ? `<div class="muted small" style="margin-top:4px">${c.why}</div>` : ""}</li>`).join("")}</ul>
+
+    <h2>Día por día</h2>
+    <table class="cov"><thead><tr><th>Día</th><th>Sueño</th><th>HRV</th><th>FC</th><th>SpO₂</th><th class="r">Pasos</th><th>Entreno</th></tr></thead>
+      <tbody>${ultimos.map((d) => {
+        const dot = (ok) => `<span class="${ok ? "ok-dot" : "no-dot"}" aria-label="${ok ? "sí" : "falta"}"></span>`;
+        return `<tr><td>${DIAS[parseDay(d.day).getDay()].slice(0, 3)} ${shortDate(parseDay(d.day))}</td>
+          <td>${dot(n(d.sleep_seconds) > 0)}</td><td>${dot(n(d.hrv_last_night_avg) !== null)}</td><td>${dot(n(d.resting_hr) !== null)}</td>
+          <td>${dot(n(d.spo2_avg) !== null)}</td><td class="r">${fmt(d.steps)}</td><td>${actDias.has(d.day) ? "✓" : ""}</td></tr>`; }).join("")}</tbody></table>
+    <p class="muted small">El día de hoy se completa a medida que tu reloj sincroniza. Un círculo vacío es un dato que Garmin no registró.</p>
+
+    <h2>Fuerza</h2>
+    ${sesiones.length ? `<ul class="warn-list">
+      <li><strong>${conPeso} de ${sets.length} series</strong> tienen el peso cargado.${conPeso < sets.length ? " Sin peso no se puede medir si progresás en carga: al terminar cada serie, confirmá el peso en el reloj (o editalo después en Garmin Connect)." : ""}</li>
+      ${Object.keys(raras).length ? `<li>El reloj reconoció ejercicios que no están en tu rutina: ${Object.entries(raras).map(([k, v]) => `${esc(EJ[k] || k.toLowerCase().replace(/_/g, " "))} (${v})`).join(", ")}. Probablemente sean estocadas u otros ejercicios mal reconocidos: corregilos en Garmin Connect, en el detalle de la actividad.</li>` : ""}
+      ${sesiones.map(([day, ss]) => `<li>${shortDate(parseDay(day))}: ${ss.length} ${ss.length === 1 ? "serie" : "series"}, ${ss.reduce((t, s) => t + (n(s.reps) || 0), 0)} repeticiones${ss.length <= 2 ? " (no se marcaron las series)" : ""}.</li>`).join("")}
+    </ul>` : `<p class="muted">Sin sesiones de fuerza en los últimos 30 días.</p>`}
+
+    ${tiposRaros.length ? `<h2>Actividades para revisar</h2><p>${tiposRaros.length} ${tiposRaros.length === 1 ? "actividad quedó grabada" : "actividades quedaron grabadas"} como Movilidad (${tiposRaros.map((a) => shortDate(parseDay(a.day))).join(", ")}). Si fueron fútbol o circuito, cambiá el tipo en Garmin Connect: la app las clasifica según ese tipo.</p>` : ""}
+
+    <h2>Lo que tu reloj no mide</h2>
+    <p class="small">El vívoactive 6 no calcula Training Readiness, Training Status ni carga aguda (por eso la disposición la calcula esta app). El VO₂ máx necesita carreras al aire libre de 20 minutos o más con GPS. El peso solo llega si lo cargás en Garmin Connect.</p>
+
+    <h2>Lecturas recientes</h2>
+    <table class="t"><thead><tr><th>Cuándo</th><th>Resultado</th></tr></thead>
+      <tbody>${logs.map((l) => `<tr><td>${cuando(l.ran_at)}</td><td>${l.status === "ok" ? `${l.days_synced} días, ${l.activities_synced} actividades` : `<span style="color:${css("--stop")}">Error: ${esc((l.message || "").slice(0, 80))}</span>`}</td></tr>`).join("")}</tbody></table>
+    ${reqs.length ? `<p class="muted small">Último pedido de actualización: ${cuando(reqs[0].requested_at)} (${reqs[0].source === "app" ? "desde la app" : "automático"}).</p>` : ""}
+
+    <h2>Actualización automática</h2>
+    ${e.token_ok ? `<p>Configurada: la app le pide datos a Garmin cada hora, y podés forzarlo con <strong>Actualizar ahora</strong>.</p>
+      <details><summary class="small muted">Reemplazar el permiso de GitHub</summary>${tokenForm()}</details>`
+      : `<p>Para que la lectura sea puntual cada hora y funcione el botón <strong>Actualizar ahora</strong>, la app necesita un permiso de GitHub (se crea una sola vez):</p>
+      <ol class="steps">
+        <li>Abrí <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com → Fine-grained token</a>.</li>
+        <li>Nombre: <strong>mi-rendimiento</strong>. Vencimiento: 1 año.</li>
+        <li>Repository access: <strong>Only select repositories</strong> → <strong>garmin</strong>.</li>
+        <li>Permissions → Repository → <strong>Actions: Read and write</strong>.</li>
+        <li>Tocá <strong>Generate token</strong>, copialo y pegalo acá abajo.</li>
+      </ol>${tokenForm()}`}`;
+  bindToken();
+}
+function tokenForm() {
+  return `<form class="token-form" id="token-form">
+    <input id="token-in" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="github_pat_…" required>
+    <button class="btn btn-small" type="submit">Guardar permiso</button>
+    <p class="small muted" id="token-msg" role="status">Se guarda cifrado en tu base de datos y no vuelve a mostrarse.</p></form>`;
+}
+function bindToken() {
+  const f = $("#token-form");
+  if (!f) return;
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const { error } = await db.rpc("guardar_token_github", { token: $("#token-in").value });
+    if (error) { $("#token-msg").textContent = "No se pudo guardar: " + error.message; return; }
+    $("#token-msg").textContent = "Permiso guardado. Probando una actualización…";
+    await db.rpc("pedir_sincronizacion");
+    await cargarEstado();
+    go("datos");
+  };
+}
+
 /* ---------- navegación ---------- */
-const PANTALLAS = { hoy: renderHoy, futbol: renderFutbol, fuerza: renderFuerza, sueno: renderSueno, progreso: renderProgreso };
+const PANTALLAS = { hoy: renderHoy, futbol: renderFutbol, fuerza: renderFuerza, sueno: renderSueno, progreso: renderProgreso, datos: renderDatos };
 async function go(tab) {
   document.querySelectorAll(".tabs button").forEach((b) => (b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
   view.innerHTML = `<p class="muted">Cargando…</p>`;
-  try { await PANTALLAS[tab](); }
+  try {
+    await cargarEstado();
+    await PANTALLAS[tab]();
+    view.insertAdjacentHTML("afterbegin", estadoHTML(ESTADO, tab));
+    bindEstado(tab);
+  }
   catch (e) { view.innerHTML = `<div class="empty"><strong>No se pudieron cargar los datos.</strong>${esc(e.message || e)}<br>Revisá tu conexión y volvé a abrir la pestaña.</div>`; }
   window.scrollTo(0, 0);
   try { localStorage.setItem("tab", tab); } catch {}
